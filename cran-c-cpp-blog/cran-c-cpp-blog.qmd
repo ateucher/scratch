@@ -6,15 +6,15 @@ format:
     self-contained: true
 ---
 
-The R package landscape is dynamic one, with changes in infrastructure common, especially when CRAN makes changes to their policies and requirements. This is particularly true for packages that include low-level compiled code, requiring developers to be nimble in responding to these changes.
+The R package landscape is dynamic, with changes in infrastructure common, especially when CRAN makes changes to their policies and requirements. This is particularly true for packages that include low-level compiled code, requiring developers to be nimble in responding to these changes.
 
 The tidyverse team at Posit is in the unique situation where we have a concentration of skilled developers whose job it is to create and maintain open source packages. This internal community provides the opportunity to iterate collaboratively to develop best practices and come up with solutions to problems that arise.
 
 There have been a few recent changes at CRAN for packages containing C and C++ code that developers have had to adapt to, and we would like to share some of our learning:
 
-## 1. NOTE regarding `SystemRequirements: C++11`
+## NOTE regarding `SystemRequirements: C++11`
 
-Many package authors might have noticed a new NOTE on R-devel when submitting to CRAN a package containing C++ code:
+Many package authors might have noticed a new NOTE on R-devel when submitting a package to CRAN containing C++ code:
 
 ```
 * checking C++ specification ...
@@ -27,22 +27,22 @@ This NOTE is now appearing during R CMD check on R-devel for packages where the 
 SystemRequirements: C++11 
 ```
 
-Packages that use C++11 would also usually have set `CXX_STD=CXX11` in the src/Makevars and src/Makevars.win files (and src/Makevars.ucrt, if present). These specifications tell R to use the C++11 standard when compiling the code.
+Packages that use C++11 would also usually have set `CXX_STD=CXX11` in the `src/Makevars` and `src/Makevars.win` files (and `src/Makevars.ucrt`, if present). These specifications tell R to use the C++11 standard when compiling the code.
 
 To understand the NOTE, a bit of history will be helpful (thanks to Winston Chang for [writing this up](https://gist.github.com/wch/849ca79c9416795d99c48cc06a44ca1e)):
 
--   In R 3.5 and below, on systems with an old compiler, R would default to using the C++98 standard when compiling the code. If a package needed a C++11 compiler, the DESCRIPTION file needed to have `SystemRequirements: C++11`, and the various src/Makevars\* files needed to set `CXX_STD=CXX11`.
+-   In R 3.5 and below, on systems with an old compiler, R would default to using the C++98 standard when compiling the code. If a package needed a C++11 compiler, the DESCRIPTION file needed to have `SystemRequirements: C++11`, and the various `src/Makevars*` files needed to set `CXX_STD=CXX11`.
 -   In R 3.6.2, R began defaulting to compiling packages with the C++11 standard, as long as the compiler supported C++11 (which was true on most systems).
--   In R 4.0, C++11 became the minimum supported compiler, so `SystemRequirements: C++11` was no longer necessary. In (the forthcoming) R 4.3, [R CMD check now raises a NOTE](https://developer.r-project.org/blosxom.cgi/R-devel/NEWS/2023/01/31) if `SystemRequirements: C++11` is present or the various src/Makevars\* contain `CXX_STD=CXX11`. This is because this specification is unnecessary and can reduce future portability when the code is valid under C++14 or C++17. This NOTE will block submission to CRAN.
+-   In R 4.0, C++11 became the minimum supported compiler, so `SystemRequirements: C++11` was no longer necessary. In (the forthcoming) R 4.3, [R CMD check now raises a NOTE](https://developer.r-project.org/blosxom.cgi/R-devel/NEWS/2023/01/31) if `SystemRequirements: C++11` is present or the various `src/Makevars*` contain `CXX_STD=CXX11`. This is because this specification is unnecessary and can reduce future portability when the code is valid under C++14 or C++17. This NOTE will block submission to CRAN.
 
 ### How to fix it
 
-1.  Edit the DESCRIPTION file and remove `SystemRequirements: C++11`
+1.  Edit the DESCRIPTION file and remove `SystemRequirements: C++11`.
 2.  Edit `src/Makevars`, `src/Makevars.win`, and `src/Makevars.ucrt` and remove `CXX_STD=CXX11`.
 
-After making these changes, the package should install without trouble on R 3.6 and above. However, on R 3.5 and below, there may be systems with very old compilers where it won't build (RHEL 7 is one such system). In practice, the vast majority of users will have a newer version of R installed, so in most cases it should be fine to just support R \>= 3.6.2 in your package. If you want to be confident that your package will be installable on R 3.5 and below with old compilers, there are several options; we offer two of the simplest approaches here:
+After making these changes, the package should install without trouble on R 3.6 and above. However, on R 3.5 and below, there may be systems with very old compilers where it won't build (RHEL 7 is one such system). In practice, the vast majority of users will have a newer version of R installed and/or have recent enough compilers. If you want to be confident that your package will be installable on R 3.5 and below with old compilers, there are several options; we offer two of the simplest approaches here:
 
--   You can use a configure script at the top level of the package, and have it add `CXX_STD=CXX11` for R 3.5 and below. An example (unmerged) [pull request to the readxl](https://github.com/tidyverse/readxl/pull/722/files) package demonstrates this approach.
+-   You can use a configure script at the top level of the package, and have it add `CXX_STD=CXX11` for R 3.5 and below. An example (unmerged) [pull request to the readxl](https://github.com/tidyverse/readxl/pull/722/files) package demonstrates this approach. You will also need to add `Biarch: true` in your DESCRIPTION file. This appears to be the approach preferred by CRAN.
 -   For users with R \<= 3.5 on a system with an older compiler, package authors can instruct users to edit their `~/.R/Makevars` file to include this line: `CXX_STD=CXX11`
 
 ```{=html}
@@ -51,9 +51,12 @@ other potentially helpful ref:
 https://cran.r-project.org/doc/manuals/r-devel/R-exts.html#Using-C_002b_002b-code 
 -->
 ```
-## 2. WARNING regarding the use of `sprintf()` in C/C++
 
-Another recent change in CRAN checks on R-devel that authors might encounter is the disallowing of the use of the C functions `sfprint()` and `vsprinf()`. R CMD check on R-devel may throw warnings that look something like this:
+tidyverse has a [policy of supporting four previous versions](https://www.tidyverse.org/blog/2019/04/r-version-support/) of R. Currently that includes R 3.5, but with the upcoming release of R 4.3 the minimum version we will support is R 3.6. As we won't be supporting R 3.5 in the near future, you should not feel pressured to either unless you have a compelling reason.
+
+## WARNING regarding the use of `sprintf()` in C/C++
+
+Another recent change in CRAN checks on R-devel that authors might encounter is the disallowing of the use of the C functions `sfprint()` and `vsprintf()`. R CMD check on R-devel may throw warnings that look something like this:
 
 ```
 checking compiled code ... WARNING
@@ -103,8 +106,6 @@ say_height(1824) # This will abort due to buffer overflow
 In most cases, this should be a simple fix: replace `sprintf()` with `snprintf()` and `vsprintf()` with `vsnprintf()`. These `n` variants take a second parameter that specifies the maximum number of bytes written. If the output is a static buffer, you can use `sizeof()`:
 
 ```{r}
-library(cpp11)
-
 cpp_function('
   int say_height_safely(int height) {
     // "My height is xxx cm" is 19 characters but we need 
@@ -124,9 +125,32 @@ say_height_safely(182)
 say_height_safely(1824)
 ```
 
+If the destination is not a static buffer, the easiest thing to do is pass in the
+size of the array:
+
+```{r}
+cpp_function('
+  int say_height_safely(int height) {
+    // "My height is xxx cm" is 19 characters but we need 
+    // to add one for the null-terminator
+    size_t size = 19 + 1; 
+    char out[size]; 
+    int n; 
+    n = snprintf(out, size, "My height is %i cm", height);
+    Rprintf(out);
+    if (n >= sizeof(out)) {
+       Rprintf("\\nTruncated because input is longer than allowed!\\n");
+    }
+    return n;
+  }
+')
+
+say_height_safely(1824)
+```
+
 <!-- ref: https://www.stats.ox.ac.uk/pub/bdr/sprintf.txt -->
 
-## 3. WARNING regarding the use of strict prototypes in C
+## WARNING regarding the use of strict prototypes in C
 
 Many maintainers with packages containing C code have also been getting hit with this warning:
 
@@ -134,7 +158,7 @@ Many maintainers with packages containing C code have also been getting hit with
 warning: a function declaration without a prototype is deprecated in all versions of C [-Wstrict-prototypes]
 ```
 
-This comes from C function declarations that look like this, with no arguments specified (which is very common):
+This usually comes from C function declarations that look like this, with no arguments specified (which is very common):
 
 ``` c
 int myfun() {
@@ -142,7 +166,7 @@ int myfun() {
 };
 ```
 
-This new warning is because CRAN is now running checks on R-devel with the `-Wstrict-prototypes` compiler flag set. In R we define functions that take no arguments with `myfun <- function() {...}` all the time. In C, with this flag set, the fact that a function takes no arguments must be explicitly stated (i.e., the arguments list cannot be empty).
+This new warning is because CRAN is now running checks on R-devel with the `-Wstrict-prototypes` compiler flag set. In R we define functions that take no arguments with `myfun <- function() {...}` all the time. In C, with this flag set, the fact that a function takes no arguments must be explicitly stated (i.e., the arguments list cannot be empty). In the upcoming C23 standard, empty function signatures will be considered valid and not ambiguous, however at this point it is likely to be the reason you encounter this warning from CRAN.
 
 ### How to fix it
 
@@ -160,9 +184,11 @@ Here is an example where the authors of [Cubist](https://topepo.github.io/Cubist
 
 Function declarations without a prototype are very common, and unfortunately are thus likely to appear in libraries that you include in your package. This may require you to patch that code in your package. The [readxl](https://readxl.tidyverse.org) package includes the [libxls C library](https://github.com/libxls/libxls), which was patched [in readxl here](https://github.com/tidyverse/readxl/commit/afdc9b90cfc2bb1e1c5490c7ba3af5ecfc4a7876) to deal with this issue.
 
-The ideal solution in this case would be to submit patches to the upstream libraries so you don't have to deal with the ongoing maintenance of you local patches, but that is not always possible.
+The ideal solution in this case would be to submit patches to the upstream libraries so you don't have to deal with the ongoing maintenance of your local patches, but that is not always possible.
 
-The `-Wstrict-prototypes` compiler flag will also catch deprecated function definitions of the form:
+The `-Wstrict-prototypes` compiler flag will also catch deprecated function definitions where the types of the arguments are not declared. This is actually likely the primary purpose for CRAN enabling this flag, as it is ambiguous and much more dangerous than empty function signatures.
+
+These take the form:
 
 ``` c
 void myfun(x, y) {
@@ -170,7 +196,7 @@ void myfun(x, y) {
 };
 ```
 
-where the argument types are not declared. This is much less common than the case of not specifying any arguments, and is solved by declaring the types of the arguments:
+where the argument types are not declared. This is solved by declaring the types of the arguments:
 
 ``` c
 void myfun(int x, char* y) {
