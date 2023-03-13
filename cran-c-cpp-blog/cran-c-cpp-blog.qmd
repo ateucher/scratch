@@ -186,6 +186,8 @@ Function declarations without a prototype are very common, and unfortunately are
 
 The ideal solution in this case would be to submit patches to the upstream libraries so you don't have to deal with the ongoing maintenance of your local patches, but that is not always possible.
 
+### Unspecified types in function signature
+
 The `-Wstrict-prototypes` compiler flag will also catch deprecated function definitions where the types of the arguments are not declared. This is actually likely the primary purpose for CRAN enabling this flag, as it is ambiguous and much more dangerous than empty function signatures.
 
 These take the form:
